@@ -55,7 +55,7 @@ stage('Update Deployment Manifest for Argo CD') {
   agent any
   environment {
     DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
-    GIT_REPO_NAME = "jenkins-deployment-manifest"
+    GIT_REPO_NAME = "jenkins-deployment-menifest"
     GIT_USER_NAME = "arup07"
   }
   steps {
