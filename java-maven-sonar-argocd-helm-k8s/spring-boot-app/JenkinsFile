@@ -56,10 +56,12 @@ pipeline {
   environment {
     GIT_REPO_NAME = "jenkins-deployment-menifest"
     GIT_USER_NAME = "arup07"
+    DOCKER_IMAGE = "arup07/ultimate-cicd:${BUILD_NUMBER}"
   }
   steps {
     withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
       sh '''
+        # Clone or reset repo
         if [ -d "${GIT_REPO_NAME}" ]; then
           cd ${GIT_REPO_NAME}
           git fetch --all
@@ -74,10 +76,10 @@ pipeline {
         git config user.email "arup221199@gmail.com"
         git config user.name "${GIT_USER_NAME}"
 
-        # Update the deployment.yml with the new Docker image
-        sed -i "s#replaceImage#${DOCKER_IMAGE}#g" deployment.yml
+        # Replace the image tag
+        sed -i "s#replaceImageTag#${BUILD_NUMBER}#g" deployment.yml
 
-        # Commit & push
+        # Commit & push changes
         git add deployment.yml
         git commit -m "Update deployment image to version ${BUILD_NUMBER}" || echo "No changes to commit"
         git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
@@ -85,8 +87,6 @@ pipeline {
     }
   }
 }
-
-
 
   } // stages
 }
