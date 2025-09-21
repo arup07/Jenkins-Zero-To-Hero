@@ -55,26 +55,33 @@ stage('Generate Deployment Manifest for Argo CD') {
   agent any
   environment {
     DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
+    GIT_REPO_NAME = "jenkins-deployment-manifest"
+    GIT_USER_NAME = "arup07"
+    GITHUB_TOKEN = credentials('github')
   }
   steps {
     sh '''
-      # Copy the template manifest to a temporary location
+      # Temporary directory for repo
       TEMP_DIR=$(mktemp -d)
-      cp jenkins-deployment-manifest/deployment.yml $TEMP_DIR/deployment.yml
+
+      # Clone deployment manifest repo
+      git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git $TEMP_DIR || { echo "Git clone failed"; exit 1; }
 
       cd $TEMP_DIR
 
-      # Replace placeholder with current build number
-      sed -i "s#replaceImageTag#${DOCKER_IMAGE_TAG}#g" deployment.yml
+      # Generate manifest for this build
+      cp deployment.yml deployment-temp.yml
+      sed -i "s#replaceImageTag#${DOCKER_IMAGE_TAG}#g" deployment-temp.yml
 
-      # Optional: apply to Kubernetes (if Argo CD is watching a cluster, you can skip this)
-      # kubectl apply -f deployment.yml
+      # Optional: apply to cluster if Argo CD watches it
+      # kubectl apply -f deployment-temp.yml
 
       # Cleanup
       rm -rf $TEMP_DIR
     '''
   }
 }
+
 
 
   } // stages
