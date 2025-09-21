@@ -51,7 +51,7 @@ pipeline {
       }
     }
 
-    stage('Update Deployment File for Argo CD') {
+stage('Update Deployment File for Argo CD') {
   agent any
   environment {
     GIT_REPO_NAME = "jenkins-deployment-manifest"
@@ -61,16 +61,11 @@ pipeline {
   steps {
     withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
       sh '''
-        # Clone the deployment manifest repo
-        if [ -d "${GIT_REPO_NAME}" ]; then
-          cd ${GIT_REPO_NAME}
-          git fetch --all
-          git reset --hard origin/main
-          git clean -fd
-        else
-          git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git
-          cd ${GIT_REPO_NAME}
-        fi
+        # Create a temporary directory for deployment repo
+        TEMP_DIR=$(mktemp -d)
+        git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git $TEMP_DIR
+
+        cd $TEMP_DIR
 
         # Configure Git
         git config user.email "arup221199@gmail.com"
@@ -83,10 +78,14 @@ pipeline {
         git add deployment.yml
         git commit -m "Update image tag to ${DOCKER_IMAGE_TAG}" || echo "No changes to commit"
         git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+
+        # Cleanup
+        rm -rf $TEMP_DIR
       '''
     }
   }
 }
+
 
 
   } // stages
