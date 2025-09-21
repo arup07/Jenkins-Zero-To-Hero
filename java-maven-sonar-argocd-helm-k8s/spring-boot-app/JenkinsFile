@@ -51,38 +51,44 @@ pipeline {
       }
     }
 
-stage('Generate Deployment Manifest for Argo CD') {
+stage('Update Deployment Manifest for Argo CD') {
   agent any
   environment {
     DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
-    GIT_REPO_NAME = "jenkins-deployment-menifest"
+    GIT_REPO_NAME = "jenkins-deployment-manifest"
     GIT_USER_NAME = "arup07"
-    GITHUB_TOKEN = credentials('github')
   }
   steps {
-    sh '''
-      # Temporary directory for repo
-      TEMP_DIR=$(mktemp -d)
+    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
+      sh '''
+        # Temporary directory for a clean clone
+        TEMP_DIR=$(mktemp -d)
 
-      # Clone deployment manifest repo
-      git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git $TEMP_DIR || { echo "Git clone failed"; exit 1; }
+        # Clone the deployment manifest repo
+        git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git $TEMP_DIR || { echo "Git clone failed!"; exit 1; }
 
-      cd $TEMP_DIR
+        cd $TEMP_DIR
 
-      # Generate manifest for this build
-      cp deployment.yml deployment-temp.yml
-      sed -i "s#replaceImageTag#${DOCKER_IMAGE_TAG}#g" deployment-temp.yml
+        # Configure Git user
+        git config user.email "arup221199@gmail.com"
+        git config user.name "${GIT_USER_NAME}"
 
-      # Optional: apply to cluster if Argo CD watches it
-      # kubectl apply -f deployment-temp.yml
+        # Replace only the tag in the image line
+        sed -i "s#\\(arup07/ultimate-cicd:\\).*#\\1${DOCKER_IMAGE_TAG}#g" deployment.yml
 
-      # Cleanup
-      rm -rf $TEMP_DIR
-    '''
+        # Commit & push only if there are changes
+        git diff --quiet || (
+          git add deployment.yml
+          git commit -m "Update image tag to ${DOCKER_IMAGE_TAG}"
+          git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main
+        )
+
+        # Cleanup
+        rm -rf $TEMP_DIR
+      '''
+    }
   }
 }
-
-
 
   } // stages
 }
