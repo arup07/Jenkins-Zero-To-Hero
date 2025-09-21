@@ -51,41 +51,28 @@ pipeline {
       }
     }
 
-stage('Update Deployment File for Argo CD') {
+stage('Generate Deployment Manifest for Argo CD') {
   agent any
   environment {
-    GIT_REPO_NAME = "jenkins-deployment-manifest" // make sure this exact repo exists
-    GIT_USER_NAME = "arup07"
     DOCKER_IMAGE_TAG = "${BUILD_NUMBER}"
   }
   steps {
-    withCredentials([string(credentialsId: 'github', variable: 'GITHUB_TOKEN')]) {
-      sh '''
-        # Check repo exists before cloning
-        echo "Cloning repo https://github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git"
+    sh '''
+      # Copy the template manifest to a temporary location
+      TEMP_DIR=$(mktemp -d)
+      cp jenkins-deployment-manifest/deployment.yml $TEMP_DIR/deployment.yml
 
-        # Use a temporary directory for a clean clone
-        TEMP_DIR=$(mktemp -d)
+      cd $TEMP_DIR
 
-        # Clone repo with token, no trailing slash
-        git clone https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git $TEMP_DIR || { echo "Git clone failed! Check repo name or token."; exit 1; }
+      # Replace placeholder with current build number
+      sed -i "s#replaceImageTag#${DOCKER_IMAGE_TAG}#g" deployment.yml
 
-        cd $TEMP_DIR
+      # Optional: apply to Kubernetes (if Argo CD is watching a cluster, you can skip this)
+      # kubectl apply -f deployment.yml
 
-        # Configure Git user
-        git config user.email "arup221199@gmail.com"
-        git config user.name "${GIT_USER_NAME}"
-
-        # Replace placeholder with current build tag
-        sed -i "s#replaceImageTag#${DOCKER_IMAGE_TAG}#g" deployment.yml
-
-        # Commit & push only if there are changes
-        git diff --quiet || (git add deployment.yml && git commit -m "Update image tag to ${DOCKER_IMAGE_TAG}" && git push https://${GITHUB_TOKEN}@github.com/${GIT_USER_NAME}/${GIT_REPO_NAME}.git HEAD:main)
-
-        # Cleanup temporary directory
-        rm -rf $TEMP_DIR
-      '''
-    }
+      # Cleanup
+      rm -rf $TEMP_DIR
+    '''
   }
 }
 
